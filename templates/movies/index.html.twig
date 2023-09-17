@@ -10,8 +10,12 @@
 
 <div class="example-wrapper">
     <h1>Hello {{ controller_name }}! ✅</h1>
-    {%if name%}
-        <h2>{{name}}<h2>
+    <h1>Movies: </h1>
+    {%if movies%}
+    {%for m in movies%}
+        <h2>{{m.name}}<h2>
+        <h6>{{m.rating}}<h6>
+    {%endfor %}
     {%else %}
         <h2>No movies<h2>
     {%endif %}
