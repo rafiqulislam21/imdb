@@ -1,99 +1,174 @@
 <?php
 
+
 namespace App\Controller;
+
 
 use App\Entity\Movie;
 use App\Form\MovieFormType;
 use App\Repository\MovieRepository;
 use Doctrine\ORM\EntityManagerInterface;
-use Doctrine\ORM\Mapping\Id;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\File\Exception\FileException;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 
 class MoviesController extends AbstractController
 {
     private $em;
-    public function __construct(EntityManagerInterface $em)
+    private $movieRepository;
+    public function __construct(EntityManagerInterface $em, MovieRepository $movieRepository) 
     {
         $this->em = $em;
+        $this->movieRepository = $movieRepository;
     }
 
 
-     /**
+    /**
      * @Route("/movies", name="movies", methods={"GET"})
      */
-    public function movies(): Response
+    public function index(): Response
     {
-        // findAll() SELECT * FROM movies;
-        // find() SELECT * FROM movies where id=5
-        // findBy() SELECT * FROM movies ORDER BY id DESC
-        // findByOne() SELECT * FROM movies WHERE id = 6 
-            // AND title = 'the dark knoght' ORDER By id DESC
-        // count() SELECT COOUNT() from movies WHERE id = 1
-        // $movies = $repository->count(['id'=>5]);
-        // $movies = $repository->findOneBy(['id' => 6], ['id'=> DESC]);
-
-
-        $repository = $this->em->getRepository(Movie::class);
-        $movies = $repository->findall();
-        // dd($movies);
+        $movies = $this->movieRepository->findAll();
 
         return $this->render('movies/index.html.twig', [
-            'controller_name' => 'MoviesController',
-            'movies' => $movies,
+            'movies' => $movies
         ]);
     }
 
     /**
-     * @Route("/movies/{id}", name="movieDetails", methods={"GET"})
+     * @Route("/movies/create", name="create_movie")
      */
-    public function movieDetails($id): Response
+    public function create(Request $request): Response
     {
-
-        $repository = $this->em->getRepository(Movie::class);
-        $movie = $repository->find($id);
-        // dd($movies);
-
-        return $this->render('movies/show.html.twig', [
-            'controller_name' => 'MovieController',
-            'movie' => $movie,
-        ]);
-    }
-
-    /**
-     * @Route("/movies/create", name="createmovie", methods={"GET"})
-     */
-    public function movieCreate(): Response
-    {
-
         $movie = new Movie();
         $form = $this->createForm(MovieFormType::class, $movie);
+        
+        $form->handleRequest($request);
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            $newMovie = $form->getData();
+            $imagePath = $form->get('imagePath')->getData();
+            
+            if ($imagePath) {
+                $newFileName = uniqid() . '.' . $imagePath->guessExtension();
+
+                try {
+                    $imagePath->move(
+                        $this->getParameter('kernel.project_dir') . '/public/uploads',
+                        $newFileName
+                    );
+                } catch (FileException $e) {
+                    return new Response($e->getMessage());
+                }
+                // $newMovie->setUserId($this->getUser()->getId());
+                $newMovie->setImagePath('/uploads/' . $newFileName);
+            }
+
+            $this->em->persist($newMovie);
+            $this->em->flush();
+
+            return $this->redirectToRoute('movies');
+        }
+
         return $this->render('movies/create.html.twig', [
             'form' => $form->createView()
         ]);
     }
 
+    /**
+     * @Route("/movies/edit/{id}", name="edit_movie")
+     */
+    public function edit(int $id, Request $request): Response 
+    {
+        // $this->checkLoggedInUser($id);
+        $movie = $this->movieRepository->find($id);
 
-    // // #[Route('/movis', name:'movies')] new version
-    // /**
-    //  * @Route("/movies/{name}", name="movieDetails", defaults={"name"=null}, methods={"GET"})
-    //  */
-    // public function movieDetails($name): JsonResponse
-    // {
-    //     return $this->json([
-    //         'message' => 'Movie name is ' . $name,
-    //         'path' => 'src/Controller/MoviesController.php',
-    //     ]);
-    // }
+        $form = $this->createForm(MovieFormType::class, $movie);
 
-    // /**
-    //  * @Route("/movies", name="app_movies")
-    //  */
-    // public function index(): Response
-    // {
-    //     return $this->render('movies/index.html.twig', [
-    //         'controller_name' => 'MoviesController',
-    //     ]);
+        $form->handleRequest($request);
+        $imagePath = $form->get('imagePath')->getData();
+
+        if ($form->isSubmitted() && $form->isValid()) {
+            if ($imagePath) {
+                if ($movie->getImagePath() !== null) {
+                    if (file_exists(
+                        $this->getParameter('kernel.project_dir') . $movie->getImagePath()
+                        )) {
+                            $this->GetParameter('kernel.project_dir') . $movie->getImagePath();
+                    }
+                    $newFileName = uniqid() . '.' . $imagePath->guessExtension();
+
+                    try {
+                        $imagePath->move(
+                            $this->getParameter('kernel.project_dir') . '/public/uploads',
+                            $newFileName
+                        );
+                    } catch (FileException $e) {
+                        return new Response($e->getMessage());
+                    }
+
+                    $movie->setImagePath('/uploads/' . $newFileName);
+                    $this->em->flush();
+
+                    return $this->redirectToRoute('movies');
+                }
+            } else {
+                $movie->setTitle($form->get('title')->getData());
+                $movie->setReleaseYear($form->get('releaseYear')->getData());
+                $movie->setDescription($form->get('description')->getData());
+
+                $this->em->flush();
+                return $this->redirectToRoute('movies');
+            }
+        }
+
+        return $this->render('movies/edit.html.twig', [
+            'movie' => $movie,
+            'form' => $form->createView()
+        ]);
+    }
+
+     /**
+     * @Route("/movies/delete/{id}",  methods= {"GET", "DELETE"}, name="delete_movie")
+     */
+    public function delete($id): Response
+    {
+        // $this->checkLoggedInUser($id);
+        $movie = $this->movieRepository->find($id);
+        $this->em->remove($movie);
+        $this->em->flush();
+
+        return $this->redirectToRoute('movies');
+    }
+
+     /**
+     * @Route("/movies/{id}", name="show_movie", methods={"GET"})
+     */
+    public function show(int $id): Response
+    {
+        $movie = $this->movieRepository->find($id);
+        
+        return $this->render('movies/show.html.twig', [
+            'movie' => $movie
+        ]);
+    }
+
+    // private function checkLoggedInUser($movieId) {
+    //     if($this->getUser() == null || $this->getUser()->getId() !== $movieId) {
+    //         return $this->redirectToRoute('movies');
+    //     }
     // }
 }
+
+
+       // findAll() SELECT * FROM movies;
+        // find() SELECT * FROM movies where id=5
+        // findBy() SELECT * FROM movies ORDER BY id DESC
+        // findByOne() SELECT * FROM movies WHERE id = 6 
+        // AND title = 'the dark knoght' ORDER By id DESC
+        // count() SELECT COOUNT() from movies WHERE id = 1
+        // $movies = $repository->count(['id'=>5]);
+        // $movies = $repository->findOneBy(['id' => 6], ['id'=> DESC]);
