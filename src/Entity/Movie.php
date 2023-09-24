@@ -6,6 +6,7 @@ use App\Repository\MovieRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Validator\Constraints as Assert;
 
 /**
  * @ORM\Entity(repositoryClass=MovieRepository::class)
@@ -21,16 +22,20 @@ class Movie
 
     /**
      * @ORM\Column(type="string", length=255)
+     * @Assert\NotBlank
+     * @Assert\Length(min=3)
      */
     private $title;
 
     /**
      * @ORM\Column(type="integer")
+     * @Assert\NotBlank
      */
     private $releaseYear;
 
     /**
      * @ORM\Column(type="string", length=255, nullable=true)
+     * @Assert\NotBlank
      */
     private $description;
 
@@ -40,9 +45,14 @@ class Movie
     private $imagePath;
 
     /**
-     * @ORM\ManyToMany(targetEntity=Actor::class, inversedBy="actors")
+     * @ORM\ManyToMany(targetEntity=Actor::class, inversedBy="movies")
      */
     private $actors;
+
+    // /**
+    //  * @ORM\Column(type="integer")
+    //  */
+    // private $userId;
 
     public function __construct()
     {
@@ -59,7 +69,7 @@ class Movie
         return $this->title;
     }
 
-    public function setTitle(string $title): self
+    public function setTitle(?string $title): self
     {
         $this->title = $title;
 
@@ -71,7 +81,7 @@ class Movie
         return $this->releaseYear;
     }
 
-    public function setReleaseYear(int $releaseYear): self
+    public function setReleaseYear(?int $releaseYear): self
     {
         $this->releaseYear = $releaseYear;
 
@@ -95,7 +105,7 @@ class Movie
         return $this->imagePath;
     }
 
-    public function setImagePath(string $imagePath): self
+    public function setImagePath(?string $imagePath): self
     {
         $this->imagePath = $imagePath;
 
@@ -103,7 +113,7 @@ class Movie
     }
 
     /**
-     * @return Collection<int, Actor>
+     * @return Collection|Actor[]
      */
     public function getActors(): Collection
     {
@@ -125,4 +135,16 @@ class Movie
 
         return $this;
     }
+
+    // public function getUserId(): ?int
+    // {
+    //     return $this->userId;
+    // }
+
+    // public function setUserId(int $userId): self
+    // {
+    //     $this->userId = $userId;
+
+    //     return $this;
+    // }
 }
